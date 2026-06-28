@@ -1,6 +1,7 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
+/* ─── Types ─────────────────────────────────────────────────────────────── */
 interface BookRecommendation {
      judul: string;
      penulis?: string;
@@ -8,7 +9,6 @@ interface BookRecommendation {
      sinopsis?: string;
      tahun?: number | string;
 }
-
 interface EmotionResult {
      primary_emotion: string;
      primary_score: number;
@@ -17,95 +17,160 @@ interface EmotionResult {
      book_recommendations: BookRecommendation[];
 }
 
+/* ─── Data ───────────────────────────────────────────────────────────────── */
 const EMOTION_META: Record<
      string,
      {
           label: string;
           emoji: string;
           accent: string;
-          glow: string;
           gradFrom: string;
           gradTo: string;
+          ring: string;
      }
 > = {
      sadness: {
           label: "Sedih",
           emoji: "😢",
-          accent: "#6366f1",
-          glow: "#6366f122",
-          gradFrom: "#1e1b4b",
-          gradTo: "#312e81",
+          accent: "#818cf8",
+          ring: "ring-indigo-500/30",
+          gradFrom: "from-indigo-950",
+          gradTo: "to-indigo-900",
      },
      happy: {
           label: "Bahagia",
           emoji: "😊",
-          accent: "#f59e0b",
-          glow: "#f59e0b22",
-          gradFrom: "#78350f",
-          gradTo: "#92400e",
+          accent: "#fbbf24",
+          ring: "ring-amber-500/30",
+          gradFrom: "from-amber-950",
+          gradTo: "to-amber-900",
      },
      joy: {
           label: "Gembira",
           emoji: "😄",
           accent: "#fbbf24",
-          glow: "#fbbf2422",
-          gradFrom: "#78350f",
-          gradTo: "#92400e",
+          ring: "ring-amber-500/30",
+          gradFrom: "from-amber-950",
+          gradTo: "to-amber-900",
      },
      love: {
           label: "Cinta",
           emoji: "❤️",
-          accent: "#f43f5e",
-          glow: "#f43f5e22",
-          gradFrom: "#4c0519",
-          gradTo: "#881337",
+          accent: "#fb7185",
+          ring: "ring-rose-500/30",
+          gradFrom: "from-rose-950",
+          gradTo: "to-rose-900",
      },
      anger: {
           label: "Marah",
           emoji: "😤",
-          accent: "#ef4444",
-          glow: "#ef444422",
-          gradFrom: "#450a0a",
-          gradTo: "#7f1d1d",
+          accent: "#f87171",
+          ring: "ring-red-500/30",
+          gradFrom: "from-red-950",
+          gradTo: "to-red-900",
      },
      fear: {
           label: "Takut",
           emoji: "😨",
-          accent: "#a855f7",
-          glow: "#a855f722",
-          gradFrom: "#3b0764",
-          gradTo: "#581c87",
+          accent: "#c084fc",
+          ring: "ring-purple-500/30",
+          gradFrom: "from-purple-950",
+          gradTo: "to-purple-900",
      },
      surprise: {
           label: "Terkejut",
           emoji: "😲",
-          accent: "#06b6d4",
-          glow: "#06b6d422",
-          gradFrom: "#083344",
-          gradTo: "#164e63",
+          accent: "#22d3ee",
+          ring: "ring-cyan-500/30",
+          gradFrom: "from-cyan-950",
+          gradTo: "to-cyan-900",
      },
      neutral: {
           label: "Netral",
           emoji: "😐",
           accent: "#94a3b8",
-          glow: "#94a3b822",
-          gradFrom: "#0f172a",
-          gradTo: "#1e293b",
+          ring: "ring-slate-500/30",
+          gradFrom: "from-slate-900",
+          gradTo: "to-slate-800",
      },
 };
 
-const GENRE_COLOR: Record<string, string> = {
-     romance: "#f43f5e",
-     fiksi_sastra: "#8b5cf6",
-     novel: "#3b82f6",
-     adventure: "#f97316",
-     thriller: "#475569",
-     horor: "#dc2626",
-     mystery: "#7c3aed",
-     fiksi_ilmiah: "#0ea5e9",
-     fantasi: "#a855f7",
-     pengembangan_diri: "#10b981",
-     cerpen: "#ec4899",
+const GENRE_COLOR: Record<
+     string,
+     { text: string; bg: string; border: string; dot: string }
+> = {
+     romance: {
+          text: "text-rose-400",
+          bg: "bg-rose-400/10",
+          border: "border-rose-400/20",
+          dot: "bg-rose-400",
+     },
+     fiksi_sastra: {
+          text: "text-violet-400",
+          bg: "bg-violet-400/10",
+          border: "border-violet-400/20",
+          dot: "bg-violet-400",
+     },
+     novel: {
+          text: "text-blue-400",
+          bg: "bg-blue-400/10",
+          border: "border-blue-400/20",
+          dot: "bg-blue-400",
+     },
+     adventure: {
+          text: "text-orange-400",
+          bg: "bg-orange-400/10",
+          border: "border-orange-400/20",
+          dot: "bg-orange-400",
+     },
+     thriller: {
+          text: "text-slate-300",
+          bg: "bg-slate-700/30",
+          border: "border-slate-600/30",
+          dot: "bg-slate-400",
+     },
+     horor: {
+          text: "text-red-400",
+          bg: "bg-red-400/10",
+          border: "border-red-400/20",
+          dot: "bg-red-400",
+     },
+     mystery: {
+          text: "text-purple-400",
+          bg: "bg-purple-400/10",
+          border: "border-purple-400/20",
+          dot: "bg-purple-400",
+     },
+     fiksi_ilmiah: {
+          text: "text-sky-400",
+          bg: "bg-sky-400/10",
+          border: "border-sky-400/20",
+          dot: "bg-sky-400",
+     },
+     fantasi: {
+          text: "text-fuchsia-400",
+          bg: "bg-fuchsia-400/10",
+          border: "border-fuchsia-400/20",
+          dot: "bg-fuchsia-400",
+     },
+     pengembangan_diri: {
+          text: "text-emerald-400",
+          bg: "bg-emerald-400/10",
+          border: "border-emerald-400/20",
+          dot: "bg-emerald-400",
+     },
+     cerpen: {
+          text: "text-pink-400",
+          bg: "bg-pink-400/10",
+          border: "border-pink-400/20",
+          dot: "bg-pink-400",
+     },
+};
+const DEFAULT_GENRE = {
+     text: "text-zinc-400",
+     bg: "bg-zinc-700/30",
+     border: "border-zinc-600/30",
+     dot: "bg-zinc-400",
 };
 
 const SAMPLE_MOODS = [
@@ -115,15 +180,116 @@ const SAMPLE_MOODS = [
      "Aku marah dengan sikap teman kerjaku",
 ];
 
+const HOW_STEPS = [
+     {
+          icon: "✍️",
+          n: "01",
+          title: "Ceritakan perasaanmu",
+          desc: "Tulis apapun yang kamu rasakan saat ini, bebas dan jujur.",
+     },
+     {
+          icon: "🧠",
+          n: "02",
+          title: "AI mendeteksi emosi",
+          desc: "RoBERTa menganalisis teks dan mengidentifikasi emosi dominanmu.",
+     },
+     {
+          icon: "📚",
+          n: "03",
+          title: "Dapatkan rekomendasi",
+          desc: "Buku dipilih secara semantik agar paling relevan dengan curhatan kamu.",
+     },
+];
+
+/* ─── Scroll-reveal hook ─────────────────────────────────────────────────── */
+function useReveal(threshold = 0.15) {
+     const ref = useRef<HTMLDivElement>(null);
+     const [visible, setVisible] = useState(false);
+     useEffect(() => {
+          const el = ref.current;
+          if (!el) return;
+          const obs = new IntersectionObserver(
+               ([entry]) => {
+                    if (entry.isIntersecting) {
+                         setVisible(true);
+                         obs.disconnect();
+                    }
+               },
+               { threshold },
+          );
+          obs.observe(el);
+          return () => obs.disconnect();
+     }, [threshold]);
+     return { ref, visible };
+}
+
+/* ─── Reusable reveal wrapper ────────────────────────────────────────────── */
+function Reveal({
+     children,
+     delay = 0,
+     className = "",
+}: {
+     children: React.ReactNode;
+     delay?: number;
+     className?: string;
+}) {
+     const { ref, visible } = useReveal();
+     return (
+          <div
+               ref={ref}
+               className={className}
+               style={{
+                    opacity: visible ? 1 : 0,
+                    transform: visible ? "translateY(0)" : "translateY(28px)",
+                    transition: `opacity .6s ${delay}ms ease, transform .6s ${delay}ms ease`,
+               }}
+          >
+               {children}
+          </div>
+     );
+}
+
+/* ─── Confidence bar ─────────────────────────────────────────────────────── */
+function Bar({
+     pct,
+     color,
+     height = 6,
+}: {
+     pct: number;
+     color: string;
+     height?: number;
+}) {
+     const [w, setW] = useState(0);
+     useEffect(() => {
+          const t = setTimeout(() => setW(pct), 80);
+          return () => clearTimeout(t);
+     }, [pct]);
+     return (
+          <div
+               className="w-full rounded-full bg-zinc-800 overflow-hidden"
+               style={{ height }}
+          >
+               <div
+                    className="h-full rounded-full"
+                    style={{
+                         width: `${w}%`,
+                         background: color,
+                         transition: "width .8s cubic-bezier(.16,1,.3,1)",
+                    }}
+               />
+          </div>
+     );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 export default function Home() {
      const [text, setText] = useState("");
      const [result, setResult] = useState<EmotionResult | null>(null);
      const [loading, setLoading] = useState(false);
      const [error, setError] = useState("");
-     const [charCount, setCharCount] = useState(0);
      const resultRef = useRef<HTMLDivElement>(null);
 
-     const analyze = async () => {
+     const analyze = useCallback(async () => {
           if (!text.trim()) return;
           setLoading(true);
           setError("");
@@ -144,7 +310,7 @@ export default function Home() {
           } finally {
                setLoading(false);
           }
-     };
+     }, [text]);
 
      useEffect(() => {
           if (result && resultRef.current) {
@@ -154,7 +320,7 @@ export default function Home() {
                               behavior: "smooth",
                               block: "start",
                          }),
-                    100,
+                    120,
                );
           }
      }, [result]);
@@ -164,733 +330,307 @@ export default function Home() {
           : null;
 
      return (
-          <>
+          <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans antialiased">
+               {/* ── Global keyframes ─────────────────────────────────────────────── */}
                <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #09090b; color: #fafafa; }
-
-        @keyframes spin   { to { transform: rotate(360deg); } }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse  { 0%,100%{opacity:.6} 50%{opacity:1} }
-        @keyframes float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-
-        .fade-up   { animation: fadeUp .5s ease both; }
-        .fade-up-2 { animation: fadeUp .5s .1s ease both; }
-        .fade-up-3 { animation: fadeUp .5s .2s ease both; }
-
-        .pill-btn {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 6px 14px; border-radius: 99px; border: 1.5px solid #27272a;
-          background: #18181b; color: #a1a1aa; font-size: 13px; font-weight: 500;
-          cursor: pointer; transition: all .2s; font-family: inherit;
-        }
-        .pill-btn:hover { border-color: #52525b; color: #fafafa; background: #27272a; }
-
-        .cta-btn {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 14px; border: none;
-          background: #fafafa; color: #09090b;
-          font-size: 15px; font-weight: 700; cursor: pointer;
-          transition: all .2s; font-family: inherit;
-          box-shadow: 0 0 0 0 rgba(255,255,255,.3);
-        }
-        .cta-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255,255,255,.15); }
-        .cta-btn:disabled { opacity: .4; cursor: not-allowed; }
-        .cta-btn.loading { background: #27272a; color: #a1a1aa; }
-
-        .textarea-wrap { position: relative; }
-        .textarea-wrap textarea {
-          width: 100%; background: #18181b; border: 1.5px solid #27272a;
-          border-radius: 16px; padding: 20px; color: #fafafa;
-          font-size: 16px; font-family: inherit; line-height: 1.7;
-          resize: none; outline: none; transition: border-color .2s;
-        }
-        .textarea-wrap textarea::placeholder { color: #52525b; }
-        .textarea-wrap textarea:focus { border-color: #52525b; }
-
-        .book-card {
-          background: #18181b; border: 1.5px solid #27272a;
-          border-radius: 20px; overflow: hidden;
-          transition: transform .2s, box-shadow .2s, border-color .2s;
-          display: flex; flex-direction: column;
-        }
-        .book-card:hover { transform: translateY(-4px); border-color: #3f3f46; box-shadow: 0 20px 40px rgba(0,0,0,.4); }
-
-        .emotion-bar-track { height: 6px; background: #27272a; border-radius: 99px; overflow: hidden; }
-        .emotion-bar-fill  { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.16,1,.3,1); }
-
-        .genre-pill {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 5px 14px; border-radius: 99px;
-          font-size: 13px; font-weight: 600;
-        }
-
-        .result-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-          gap: 16px;
-        }
-
-        .nav-link { color: #71717a; font-size: 14px; text-decoration: none; transition: color .15s; }
-        .nav-link:hover { color: #fafafa; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @keyframes spin  { to { transform: rotate(360deg); } }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes pulse-dot { 0%,100%{opacity:.5} 50%{opacity:1} }
+        @keyframes blob1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(30px,-20px) scale(1.05)} }
+        @keyframes blob2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-20px,25px) scale(1.08)} }
+        .animate-spin-slow { animation: spin .7s linear infinite; }
+        .animate-float     { animation: float 3s ease-in-out infinite; }
+        .animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+        .animate-blob1     { animation: blob1 8s ease-in-out infinite; }
+        .animate-blob2     { animation: blob2 10s ease-in-out infinite; }
+        textarea:focus { outline: none; }
+        textarea::placeholder { color: #52525b; }
+        html { scroll-behavior: smooth; }
       `}</style>
 
-               <div style={{ minHeight: "100vh", background: "#09090b" }}>
-                    {/* ── Navbar ── */}
-                    <nav
-                         style={{
-                              position: "fixed",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              zIndex: 100,
-                              padding: "0 32px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              height: 64,
-                              background: "rgba(9,9,11,.8)",
-                              backdropFilter: "blur(12px)",
-                              borderBottom: "1px solid #18181b",
-                         }}
-                    >
-                         <div
-                              style={{
-                                   display: "flex",
-                                   alignItems: "center",
-                                   gap: 10,
-                              }}
-                         >
-                              <div
-                                   style={{
-                                        width: 34,
-                                        height: 34,
-                                        background: "#fafafa",
-                                        borderRadius: 10,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: 18,
-                                   }}
-                              >
-                                   📚
-                              </div>
-                              <span
-                                   style={{
-                                        fontWeight: 800,
-                                        fontSize: 17,
-                                        letterSpacing: "-0.4px",
-                                   }}
-                              >
-                                   MoodRead
-                              </span>
+               {/* ══ NAVBAR ══════════════════════════════════════════════════════════ */}
+               <nav
+                    className="fixed top-0 inset-x-0 z-50 h-16 flex items-center justify-between px-6 md:px-10
+                      bg-zinc-950/80 backdrop-blur-md border-b border-zinc-900"
+               >
+                    <div className="flex items-center gap-2.5">
+                         <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-base select-none">
+                              📚
                          </div>
-                         <div style={{ display: "flex", gap: 28 }}>
-                              <a href="#how" className="nav-link">
-                                   Cara Kerja
-                              </a>
-                              <a href="#analyze" className="nav-link">
-                                   Analisis
-                              </a>
-                         </div>
-                    </nav>
-
-                    {/* ── Hero Section ── */}
-                    <section
-                         style={{
-                              minHeight: "100vh",
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              padding: "100px 24px 60px",
-                              position: "relative",
-                              overflow: "hidden",
-                              textAlign: "center",
-                         }}
-                    >
-                         {/* Background glow blobs */}
-                         <div
-                              style={{
-                                   position: "absolute",
-                                   top: "15%",
-                                   left: "20%",
-                                   width: 500,
-                                   height: 500,
-                                   borderRadius: "50%",
-                                   background:
-                                        "radial-gradient(circle, #6366f130 0%, transparent 70%)",
-                                   filter: "blur(60px)",
-                                   pointerEvents: "none",
-                              }}
-                         />
-                         <div
-                              style={{
-                                   position: "absolute",
-                                   top: "30%",
-                                   right: "15%",
-                                   width: 400,
-                                   height: 400,
-                                   borderRadius: "50%",
-                                   background:
-                                        "radial-gradient(circle, #f43f5e20 0%, transparent 70%)",
-                                   filter: "blur(60px)",
-                                   pointerEvents: "none",
-                              }}
-                         />
-
-                         {/* Badge */}
-                         <div
-                              className="fade-up"
-                              style={{
-                                   display: "inline-flex",
-                                   alignItems: "center",
-                                   gap: 8,
-                                   padding: "6px 16px",
-                                   borderRadius: 99,
-                                   border: "1px solid #27272a",
-                                   background: "#18181b",
-                                   fontSize: 13,
-                                   color: "#a1a1aa",
-                                   marginBottom: 28,
-                              }}
+                         <span className="font-extrabold text-base tracking-tight">
+                              MoodRead
+                         </span>
+                    </div>
+                    <div className="hidden sm:flex gap-8 text-sm text-zinc-500">
+                         <a
+                              href="#how"
+                              className="hover:text-zinc-100 transition-colors duration-150"
                          >
-                              <span
-                                   style={{
-                                        width: 7,
-                                        height: 7,
-                                        borderRadius: "50%",
-                                        background: "#22c55e",
-                                        display: "inline-block",
-                                        animation: "pulse 2s infinite",
-                                   }}
-                              />
-                              Powered by RoBERTa · Sentence Transformer
-                         </div>
-
-                         {/* Headline */}
-                         <h1
-                              className="fade-up-2"
-                              style={{
-                                   fontSize: "clamp(40px, 6vw, 72px)",
-                                   fontWeight: 800,
-                                   lineHeight: 1.1,
-                                   letterSpacing: "-2px",
-                                   maxWidth: 780,
-                                   marginBottom: 24,
-                              }}
-                         >
-                              Buku yang tepat{" "}
-                              <span
-                                   style={{
-                                        background:
-                                             "linear-gradient(135deg, #6366f1, #f43f5e)",
-                                        WebkitBackgroundClip: "text",
-                                        WebkitTextFillColor: "transparent",
-                                   }}
-                              >
-                                   untuk perasaanmu
-                              </span>
-                         </h1>
-
-                         <p
-                              className="fade-up-3"
-                              style={{
-                                   fontSize: "clamp(16px, 2vw, 19px)",
-                                   color: "#71717a",
-                                   maxWidth: 520,
-                                   lineHeight: 1.7,
-                                   marginBottom: 48,
-                              }}
-                         >
-                              Ceritakan apa yang kamu rasakan. AI kami
-                              mendeteksi emosimu dan merekomendasikan buku yang
-                              paling relevan untukmu.
-                         </p>
-
-                         {/* Floating emoji pills */}
-                         <div
-                              className="fade-up-3"
-                              style={{
-                                   display: "flex",
-                                   gap: 10,
-                                   flexWrap: "wrap",
-                                   justifyContent: "center",
-                                   marginBottom: 48,
-                              }}
-                         >
-                              {[
-                                   { e: "😢", l: "Sedih" },
-                                   { e: "😊", l: "Bahagia" },
-                                   { e: "❤️", l: "Cinta" },
-                                   { e: "😤", l: "Marah" },
-                                   { e: "😨", l: "Takut" },
-                                   { e: "😲", l: "Terkejut" },
-                              ].map(({ e, l }) => (
-                                   <div
-                                        key={l}
-                                        style={{
-                                             padding: "8px 18px",
-                                             borderRadius: 99,
-                                             border: "1px solid #27272a",
-                                             background: "#18181b",
-                                             fontSize: 14,
-                                             display: "flex",
-                                             alignItems: "center",
-                                             gap: 7,
-                                             color: "#a1a1aa",
-                                        }}
-                                   >
-                                        <span>{e}</span>
-                                        <span>{l}</span>
-                                   </div>
-                              ))}
-                         </div>
-
-                         {/* CTA */}
+                              Cara Kerja
+                         </a>
                          <a
                               href="#analyze"
-                              className="fade-up-3"
-                              style={{
-                                   display: "inline-flex",
-                                   alignItems: "center",
-                                   gap: 8,
-                                   padding: "14px 32px",
-                                   borderRadius: 14,
-                                   background: "#fafafa",
-                                   color: "#09090b",
-                                   fontWeight: 700,
-                                   fontSize: 15,
-                                   textDecoration: "none",
-                                   transition: "all .2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                   (
-                                        e.currentTarget as HTMLAnchorElement
-                                   ).style.transform = "translateY(-2px)";
-                                   (
-                                        e.currentTarget as HTMLAnchorElement
-                                   ).style.boxShadow =
-                                        "0 12px 32px rgba(255,255,255,.15)";
-                              }}
-                              onMouseLeave={(e) => {
-                                   (
-                                        e.currentTarget as HTMLAnchorElement
-                                   ).style.transform = "none";
-                                   (
-                                        e.currentTarget as HTMLAnchorElement
-                                   ).style.boxShadow = "none";
-                              }}
+                              className="hover:text-zinc-100 transition-colors duration-150"
                          >
-                              Mulai Analisis <span>↓</span>
+                              Analisis
                          </a>
-                    </section>
+                    </div>
+               </nav>
 
-                    {/* ── How it works ── */}
-                    <section
-                         id="how"
-                         style={{
-                              padding: "80px 24px",
-                              maxWidth: 900,
-                              margin: "0 auto",
-                         }}
+               {/* ══ HERO ════════════════════════════════════════════════════════════ */}
+               <section
+                    className="relative min-h-screen flex flex-col items-center justify-center
+                          text-center px-6 pt-20 pb-16 overflow-hidden"
+               >
+                    {/* Glow blobs */}
+                    <div
+                         className="animate-blob1 pointer-events-none absolute top-1/4 left-1/4 w-96 h-96 rounded-full
+                        bg-indigo-600/20 blur-[80px]"
+                    />
+                    <div
+                         className="animate-blob2 pointer-events-none absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full
+                        bg-rose-600/15 blur-[80px]"
+                    />
+
+                    {/* Badge */}
+                    <div
+                         className="relative mb-8 inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                        border border-zinc-800 bg-zinc-900 text-zinc-400 text-xs font-medium"
                     >
-                         <p
-                              style={{
-                                   textAlign: "center",
-                                   fontSize: 13,
-                                   color: "#52525b",
-                                   fontWeight: 600,
-                                   letterSpacing: 2,
-                                   marginBottom: 16,
-                              }}
+                         <span className="animate-pulse-dot w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                         Powered by RoBERTa · Sentence Transformer
+                    </div>
+
+                    {/* Headline */}
+                    <h1
+                         className="relative font-extrabold tracking-tighter leading-[1.08]
+                       text-4xl sm:text-6xl lg:text-7xl max-w-3xl mb-6"
+                    >
+                         Buku yang tepat{" "}
+                         <span
+                              className="bg-gradient-to-r from-indigo-400 via-purple-400 to-rose-400
+                           bg-clip-text text-transparent"
                          >
-                              CARA KERJA
+                              untuk perasaanmu
+                         </span>
+                    </h1>
+
+                    <p className="relative text-zinc-400 text-base sm:text-lg max-w-md leading-relaxed mb-10">
+                         Ceritakan apa yang kamu rasakan. AI kami mendeteksi
+                         emosimu dan merekomendasikan buku yang paling relevan.
+                    </p>
+
+                    {/* Emotion pills */}
+                    <div className="relative flex flex-wrap gap-2 justify-center mb-12">
+                         {Object.entries(EMOTION_META).map(([, m]) => (
+                              <div
+                                   key={m.label}
+                                   className="flex items-center gap-1.5 px-4 py-1.5 rounded-full
+                         border border-zinc-800 bg-zinc-900/60 text-zinc-400 text-sm"
+                              >
+                                   <span>{m.emoji}</span>
+                                   <span>{m.label}</span>
+                              </div>
+                         ))}
+                    </div>
+
+                    {/* CTA */}
+                    <a
+                         href="#analyze"
+                         className="relative inline-flex items-center gap-2 px-8 py-4 rounded-2xl
+                     bg-white text-zinc-950 font-bold text-sm
+                     hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(255,255,255,.12)]
+                     transition-all duration-200"
+                    >
+                         Mulai Analisis <span className="text-base">↓</span>
+                    </a>
+               </section>
+
+               {/* ══ HOW IT WORKS ════════════════════════════════════════════════════ */}
+               <section id="how" className="px-6 py-24 max-w-4xl mx-auto">
+                    <Reveal>
+                         <p className="text-center text-xs font-bold tracking-[0.2em] text-zinc-600 uppercase mb-3">
+                              Cara Kerja
                          </p>
-                         <h2
-                              style={{
-                                   textAlign: "center",
-                                   fontSize: "clamp(24px, 3vw, 36px)",
-                                   fontWeight: 800,
-                                   letterSpacing: "-1px",
-                                   marginBottom: 56,
-                              }}
-                         >
+                         <h2 className="text-center font-extrabold tracking-tight text-3xl sm:text-4xl mb-14">
                               Tiga langkah sederhana
                          </h2>
-                         <div
-                              style={{
-                                   display: "grid",
-                                   gridTemplateColumns:
-                                        "repeat(auto-fit, minmax(220px, 1fr))",
-                                   gap: 20,
-                              }}
-                         >
-                              {[
-                                   {
-                                        n: "01",
-                                        icon: "✍️",
-                                        title: "Ceritakan perasaanmu",
-                                        desc: "Ketik apapun yang kamu rasakan saat ini, bebas dan jujur.",
-                                   },
-                                   {
-                                        n: "02",
-                                        icon: "🧠",
-                                        title: "AI mendeteksi emosi",
-                                        desc: "RoBERTa menganalisis teks dan mengidentifikasi emosi dominanmu.",
-                                   },
-                                   {
-                                        n: "03",
-                                        icon: "📚",
-                                        title: "Dapatkan rekomendasi",
-                                        desc: "Buku dipilih secara semantik agar paling relevan dengan curhatan kamu.",
-                                   },
-                              ].map((s) => (
+                    </Reveal>
+
+                    <div className="grid sm:grid-cols-3 gap-4">
+                         {HOW_STEPS.map((s, i) => (
+                              <Reveal key={s.n} delay={i * 100}>
                                    <div
-                                        key={s.n}
-                                        style={{
-                                             background: "#18181b",
-                                             border: "1.5px solid #27272a",
-                                             borderRadius: 20,
-                                             padding: "28px 24px",
-                                        }}
+                                        className="h-full rounded-2xl border border-zinc-800 bg-zinc-900 p-7
+                              hover:border-zinc-700 transition-colors duration-200"
                                    >
-                                        <div
-                                             style={{
-                                                  fontSize: 28,
-                                                  marginBottom: 16,
-                                             }}
-                                        >
+                                        <div className="text-3xl mb-5">
                                              {s.icon}
                                         </div>
-                                        <div
-                                             style={{
-                                                  fontSize: 11,
-                                                  color: "#52525b",
-                                                  fontWeight: 700,
-                                                  letterSpacing: 2,
-                                                  marginBottom: 8,
-                                             }}
-                                        >
+                                        <div className="text-[10px] font-bold tracking-[0.2em] text-zinc-600 mb-2">
                                              {s.n}
                                         </div>
-                                        <h3
-                                             style={{
-                                                  fontSize: 16,
-                                                  fontWeight: 700,
-                                                  marginBottom: 8,
-                                             }}
-                                        >
+                                        <h3 className="font-bold text-base mb-2">
                                              {s.title}
                                         </h3>
-                                        <p
-                                             style={{
-                                                  fontSize: 14,
-                                                  color: "#71717a",
-                                                  lineHeight: 1.6,
-                                             }}
-                                        >
+                                        <p className="text-sm text-zinc-500 leading-relaxed">
                                              {s.desc}
                                         </p>
                                    </div>
-                              ))}
-                         </div>
-                    </section>
+                              </Reveal>
+                         ))}
+                    </div>
+               </section>
 
-                    {/* ── Analyze Section ── */}
-                    <section
-                         id="analyze"
-                         style={{
-                              padding: "80px 24px",
-                              maxWidth: 760,
-                              margin: "0 auto",
-                         }}
-                    >
-                         <p
-                              style={{
-                                   textAlign: "center",
-                                   fontSize: 13,
-                                   color: "#52525b",
-                                   fontWeight: 600,
-                                   letterSpacing: 2,
-                                   marginBottom: 16,
-                              }}
-                         >
-                              ANALISIS
+               {/* ══ ANALYZE SECTION ═════════════════════════════════════════════════ */}
+               <section id="analyze" className="px-6 py-24 max-w-3xl mx-auto">
+                    <Reveal>
+                         <p className="text-center text-xs font-bold tracking-[0.2em] text-zinc-600 uppercase mb-3">
+                              Analisis
                          </p>
-                         <h2
-                              style={{
-                                   textAlign: "center",
-                                   fontSize: "clamp(24px, 3vw, 36px)",
-                                   fontWeight: 800,
-                                   letterSpacing: "-1px",
-                                   marginBottom: 8,
-                              }}
-                         >
+                         <h2 className="text-center font-extrabold tracking-tight text-3xl sm:text-4xl mb-2">
                               Ceritakan perasaanmu
                          </h2>
-                         <p
-                              style={{
-                                   textAlign: "center",
-                                   color: "#71717a",
-                                   fontSize: 15,
-                                   marginBottom: 40,
-                              }}
-                         >
+                         <p className="text-center text-zinc-500 text-sm mb-10">
                               Tulis apapun — tidak ada yang salah
                          </p>
+                    </Reveal>
 
-                         {/* Sample moods */}
-                         <div
-                              style={{
-                                   display: "flex",
-                                   gap: 8,
-                                   flexWrap: "wrap",
-                                   marginBottom: 16,
-                              }}
-                         >
+                    <Reveal delay={80}>
+                         {/* Sample mood pills */}
+                         <div className="flex flex-wrap gap-2 mb-4">
                               {SAMPLE_MOODS.map((s) => (
                                    <button
                                         key={s}
-                                        className="pill-btn"
-                                        onClick={() => {
-                                             setText(s);
-                                             setCharCount(s.length);
-                                        }}
+                                        onClick={() => setText(s)}
+                                        className="px-3 py-1.5 rounded-full border border-zinc-800 bg-zinc-900
+                           text-zinc-500 text-xs font-medium cursor-pointer
+                           hover:border-zinc-600 hover:text-zinc-200 transition-all duration-150"
                                    >
-                                        {s.substring(0, 28)}…
+                                        {s.substring(0, 30)}…
                                    </button>
                               ))}
                          </div>
 
                          {/* Textarea */}
-                         <div
-                              className="textarea-wrap"
-                              style={{ marginBottom: 16 }}
-                         >
-                              <textarea
-                                   rows={5}
-                                   placeholder="Contoh: Aku merasa sangat sedih karena kehilangan seseorang yang kusayang..."
-                                   value={text}
-                                   onChange={(e) => {
-                                        setText(e.target.value);
-                                        setCharCount(e.target.value.length);
-                                   }}
-                                   onKeyDown={(e) => {
-                                        if (e.key === "Enter" && e.ctrlKey)
-                                             analyze();
-                                   }}
-                              />
-                         </div>
-
-                         {/* Footer row */}
-                         <div
-                              style={{
-                                   display: "flex",
-                                   alignItems: "center",
-                                   justifyContent: "space-between",
-                                   marginBottom: 32,
+                         <textarea
+                              rows={5}
+                              value={text}
+                              onChange={(e) => setText(e.target.value)}
+                              onKeyDown={(e) => {
+                                   if (e.key === "Enter" && e.ctrlKey)
+                                        analyze();
                               }}
-                         >
-                              <span style={{ fontSize: 13, color: "#52525b" }}>
-                                   {charCount} karakter · Ctrl+Enter untuk kirim
+                              placeholder="Contoh: Aku merasa sangat sedih karena kehilangan seseorang yang kusayang..."
+                              className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-5 py-4
+                       text-zinc-100 text-base leading-relaxed resize-none
+                       focus:border-zinc-600 focus:ring-2 focus:ring-zinc-700
+                       transition-all duration-200 mb-3"
+                         />
+
+                         {/* Bottom row */}
+                         <div className="flex items-center justify-between mb-8">
+                              <span className="text-xs text-zinc-600">
+                                   {text.length} karakter · Ctrl+Enter untuk
+                                   kirim
                               </span>
                               <button
-                                   className={`cta-btn${loading ? " loading" : ""}`}
                                    onClick={analyze}
                                    disabled={loading || !text.trim()}
+                                   className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm
+                          transition-all duration-200
+                          ${
+                               loading || !text.trim()
+                                    ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                                    : "bg-white text-zinc-950 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(255,255,255,.12)]"
+                          }`}
                               >
                                    {loading ? (
                                         <>
-                                             <span
-                                                  style={{
-                                                       width: 16,
-                                                       height: 16,
-                                                       border: "2px solid #52525b",
-                                                       borderTopColor:
-                                                            "#a1a1aa",
-                                                       borderRadius: "50%",
-                                                       animation:
-                                                            "spin .7s linear infinite",
-                                                       display: "inline-block",
-                                                  }}
-                                             />
+                                             <span className="animate-spin-slow w-4 h-4 rounded-full border-2 border-zinc-600 border-t-zinc-300" />
                                              Menganalisis...
                                         </>
                                    ) : (
-                                        <>
-                                             Deteksi Emosi <span>✨</span>
-                                        </>
+                                        <>Deteksi Emosi ✨</>
                                    )}
                               </button>
                          </div>
 
                          {error && (
-                              <div
-                                   style={{
-                                        padding: "14px 18px",
-                                        borderRadius: 12,
-                                        background: "#450a0a",
-                                        border: "1px solid #7f1d1d",
-                                        color: "#fca5a5",
-                                        fontSize: 14,
-                                        marginBottom: 32,
-                                   }}
-                              >
+                              <div className="mb-8 px-4 py-3 rounded-xl bg-red-950/60 border border-red-900 text-red-400 text-sm">
                                    ⚠️ {error}
                               </div>
                          )}
+                    </Reveal>
 
-                         {/* ── Results ── */}
-                         {result && em && (
-                              <div ref={resultRef}>
-                                   {/* Emotion Hero Card */}
+                    {/* ══ RESULTS ════════════════════════════════════════════════════ */}
+                    {result && em && (
+                         <div ref={resultRef} className="space-y-6">
+                              {/* ── Emotion Card ── */}
+                              <Reveal>
                                    <div
-                                        style={{
-                                             borderRadius: 24,
-                                             background: `linear-gradient(135deg, ${em.gradFrom}, ${em.gradTo})`,
-                                             border: `1.5px solid ${em.accent}30`,
-                                             padding: "32px 28px",
-                                             marginBottom: 20,
-                                             position: "relative",
-                                             overflow: "hidden",
-                                        }}
+                                        className={`relative rounded-3xl bg-gradient-to-br ${em.gradFrom} ${em.gradTo}
+                               border ring-2 ${em.ring} border-white/5 p-7 overflow-hidden`}
                                    >
-                                        {/* Glow */}
+                                        {/* Glow orb */}
                                         <div
-                                             style={{
-                                                  position: "absolute",
-                                                  top: -60,
-                                                  right: -60,
-                                                  width: 200,
-                                                  height: 200,
-                                                  borderRadius: "50%",
-                                                  background: `radial-gradient(circle, ${em.accent}40, transparent 70%)`,
-                                                  pointerEvents: "none",
-                                             }}
+                                             className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl opacity-40"
+                                             style={{ background: em.accent }}
                                         />
 
-                                        <div
-                                             style={{
-                                                  display: "flex",
-                                                  gap: 20,
-                                                  alignItems: "flex-start",
-                                                  flexWrap: "wrap",
-                                             }}
-                                        >
-                                             {/* Big emoji */}
-                                             <div
-                                                  style={{
-                                                       fontSize: 64,
-                                                       lineHeight: 1,
-                                                       filter: "drop-shadow(0 4px 12px rgba(0,0,0,.4))",
-                                                       animation:
-                                                            "float 3s ease-in-out infinite",
-                                                  }}
-                                             >
+                                        <div className="relative flex flex-wrap gap-6 items-start">
+                                             {/* Emoji */}
+                                             <div className="animate-float text-7xl leading-none drop-shadow-xl select-none">
                                                   {em.emoji}
                                              </div>
 
-                                             <div
-                                                  style={{
-                                                       flex: 1,
-                                                       minWidth: 200,
-                                                  }}
-                                             >
+                                             {/* Label + bar */}
+                                             <div className="flex-1 min-w-[180px]">
                                                   <p
+                                                       className="text-[10px] font-bold tracking-[0.2em] mb-1.5"
                                                        style={{
-                                                            fontSize: 11,
-                                                            fontWeight: 700,
-                                                            letterSpacing: 2,
-                                                            color: `${em.accent}cc`,
-                                                            marginBottom: 6,
+                                                            color:
+                                                                 em.accent +
+                                                                 "bb",
                                                        }}
                                                   >
                                                        EMOSI TERDETEKSI
                                                   </p>
-                                                  <h2
-                                                       style={{
-                                                            fontSize: 36,
-                                                            fontWeight: 800,
-                                                            letterSpacing:
-                                                                 "-1px",
-                                                            marginBottom: 16,
-                                                       }}
-                                                  >
+                                                  <h2 className="font-extrabold tracking-tight text-4xl mb-5">
                                                        {em.label}
                                                   </h2>
-                                                  {/* Confidence bar */}
-                                                  <div
-                                                       style={{
-                                                            marginBottom: 4,
-                                                       }}
-                                                  >
-                                                       <div
+                                                  <div className="flex justify-between text-xs mb-1.5">
+                                                       <span className="text-zinc-400">
+                                                            Tingkat keyakinan
+                                                       </span>
+                                                       <span
+                                                            className="font-bold"
                                                             style={{
-                                                                 display: "flex",
-                                                                 justifyContent:
-                                                                      "space-between",
-                                                                 marginBottom: 6,
+                                                                 color: em.accent,
                                                             }}
                                                        >
-                                                            <span
-                                                                 style={{
-                                                                      fontSize: 13,
-                                                                      color: "#a1a1aa",
-                                                                 }}
-                                                            >
-                                                                 Tingkat
-                                                                 keyakinan
-                                                            </span>
-                                                            <span
-                                                                 style={{
-                                                                      fontSize: 13,
-                                                                      fontWeight: 700,
-                                                                      color: em.accent,
-                                                                 }}
-                                                            >
-                                                                 {(
-                                                                      result.primary_score *
-                                                                      100
-                                                                 ).toFixed(1)}
-                                                                 %
-                                                            </span>
-                                                       </div>
-                                                       <div className="emotion-bar-track">
-                                                            <div
-                                                                 className="emotion-bar-fill"
-                                                                 style={{
-                                                                      width: `${(result.primary_score * 100).toFixed(0)}%`,
-                                                                      background:
-                                                                           em.accent,
-                                                                 }}
-                                                            />
-                                                       </div>
+                                                            {(
+                                                                 result.primary_score *
+                                                                 100
+                                                            ).toFixed(1)}
+                                                            %
+                                                       </span>
                                                   </div>
+                                                  <Bar
+                                                       pct={
+                                                            result.primary_score *
+                                                            100
+                                                       }
+                                                       color={em.accent}
+                                                       height={6}
+                                                  />
                                              </div>
 
-                                             {/* Top emotions breakdown */}
-                                             <div
-                                                  style={{
-                                                       background:
-                                                            "rgba(0,0,0,.25)",
-                                                       borderRadius: 14,
-                                                       padding: "14px 18px",
-                                                       minWidth: 180,
-                                                  }}
-                                             >
-                                                  <p
-                                                       style={{
-                                                            fontSize: 11,
-                                                            fontWeight: 700,
-                                                            letterSpacing: 1.5,
-                                                            color: "#71717a",
-                                                            marginBottom: 12,
-                                                       }}
-                                                  >
+                                             {/* Distribution */}
+                                             <div className="rounded-2xl bg-black/25 px-5 py-4 min-w-[170px] space-y-3">
+                                                  <p className="text-[10px] font-bold tracking-[0.18em] text-zinc-500 mb-3">
                                                        DISTRIBUSI EMOSI
                                                   </p>
                                                   {result.top_emotions.map(
@@ -900,76 +640,43 @@ export default function Home() {
                                                                       e.emotion
                                                                  ] ??
                                                                  EMOTION_META.neutral;
-                                                            const pct = (
-                                                                 e.score * 100
-                                                            ).toFixed(1);
+                                                            const pct =
+                                                                 e.score * 100;
                                                             return (
                                                                  <div
                                                                       key={
                                                                            e.emotion
                                                                       }
-                                                                      style={{
-                                                                           marginBottom: 10,
-                                                                      }}
                                                                  >
-                                                                      <div
-                                                                           style={{
-                                                                                display: "flex",
-                                                                                justifyContent:
-                                                                                     "space-between",
-                                                                                marginBottom: 3,
-                                                                                fontSize: 13,
-                                                                           }}
-                                                                      >
-                                                                           <span
-                                                                                style={{
-                                                                                     display: "flex",
-                                                                                     gap: 6,
-                                                                                     alignItems:
-                                                                                          "center",
-                                                                                }}
-                                                                           >
+                                                                      <div className="flex justify-between text-xs mb-1">
+                                                                           <span className="flex items-center gap-1.5 text-zinc-300">
                                                                                 <span>
                                                                                      {
                                                                                           m.emoji
                                                                                      }
                                                                                 </span>
-                                                                                <span
-                                                                                     style={{
-                                                                                          color: "#d4d4d8",
-                                                                                     }}
-                                                                                >
-                                                                                     {
-                                                                                          m.label
-                                                                                     }
-                                                                                </span>
-                                                                           </span>
-                                                                           <span
-                                                                                style={{
-                                                                                     color: "#71717a",
-                                                                                }}
-                                                                           >
                                                                                 {
-                                                                                     pct
+                                                                                     m.label
                                                                                 }
+                                                                           </span>
+                                                                           <span className="text-zinc-500 tabular-nums">
+                                                                                {pct.toFixed(
+                                                                                     1,
+                                                                                )}
                                                                                 %
                                                                            </span>
                                                                       </div>
-                                                                      <div
-                                                                           className="emotion-bar-track"
-                                                                           style={{
-                                                                                height: 4,
-                                                                           }}
-                                                                      >
-                                                                           <div
-                                                                                className="emotion-bar-fill"
-                                                                                style={{
-                                                                                     width: `${pct}%`,
-                                                                                     background:
-                                                                                          m.accent,
-                                                                                }}
-                                                                           />
-                                                                      </div>
+                                                                      <Bar
+                                                                           pct={
+                                                                                pct
+                                                                           }
+                                                                           color={
+                                                                                m.accent
+                                                                           }
+                                                                           height={
+                                                                                4
+                                                                           }
+                                                                      />
                                                                  </div>
                                                             );
                                                        },
@@ -977,165 +684,91 @@ export default function Home() {
                                              </div>
                                         </div>
                                    </div>
+                              </Reveal>
 
-                                   {/* Genre pills */}
-                                   <div style={{ marginBottom: 32 }}>
-                                        <p
-                                             style={{
-                                                  fontSize: 11,
-                                                  fontWeight: 700,
-                                                  letterSpacing: 2,
-                                                  color: "#52525b",
-                                                  marginBottom: 12,
-                                             }}
-                                        >
-                                             GENRE YANG COCOK
-                                        </p>
-                                        <div
-                                             style={{
-                                                  display: "flex",
-                                                  gap: 8,
-                                                  flexWrap: "wrap",
-                                             }}
-                                        >
-                                             {result.recommended_genres.map(
-                                                  (g) => {
-                                                       const c =
-                                                            GENRE_COLOR[g] ??
-                                                            "#71717a";
-                                                       return (
-                                                            <span
-                                                                 key={g}
-                                                                 className="genre-pill"
-                                                                 style={{
-                                                                      background: `${c}18`,
-                                                                      color: c,
-                                                                      border: `1.5px solid ${c}30`,
-                                                                 }}
-                                                            >
-                                                                 <span
-                                                                      style={{
-                                                                           width: 6,
-                                                                           height: 6,
-                                                                           borderRadius:
-                                                                                "50%",
-                                                                           background:
-                                                                                c,
-                                                                           display: "inline-block",
-                                                                      }}
-                                                                 />
-                                                                 {g.replace(
-                                                                      /_/g,
-                                                                      " ",
-                                                                 )}
-                                                            </span>
-                                                       );
-                                                  },
-                                             )}
+                              {/* ── Genre Pills ── */}
+                              <Reveal delay={60}>
+                                   <p className="text-[10px] font-bold tracking-[0.2em] text-zinc-600 uppercase mb-3">
+                                        Genre yang cocok
+                                   </p>
+                                   <div className="flex flex-wrap gap-2">
+                                        {result.recommended_genres.map((g) => {
+                                             const gc =
+                                                  GENRE_COLOR[g] ??
+                                                  DEFAULT_GENRE;
+                                             return (
+                                                  <span
+                                                       key={g}
+                                                       className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full
+                                  border text-sm font-semibold capitalize
+                                  ${gc.text} ${gc.bg} ${gc.border}`}
+                                                  >
+                                                       <span
+                                                            className={`w-1.5 h-1.5 rounded-full ${gc.dot}`}
+                                                       />
+                                                       {g.replace(/_/g, " ")}
+                                                  </span>
+                                             );
+                                        })}
+                                   </div>
+                              </Reveal>
+
+                              {/* ── Book Recommendations ── */}
+                              <Reveal delay={120}>
+                                   <div className="flex items-end justify-between mb-5">
+                                        <div>
+                                             <h3 className="font-extrabold tracking-tight text-xl">
+                                                  Rekomendasi Buku
+                                             </h3>
+                                             <p className="text-xs text-zinc-500 mt-1">
+                                                  Dipilih berdasarkan kesamaan
+                                                  makna dengan curhatan kamu
+                                             </p>
                                         </div>
+                                        <span
+                                             className="px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900
+                                 text-xs text-zinc-500"
+                                        >
+                                             {
+                                                  result.book_recommendations
+                                                       .length
+                                             }{" "}
+                                             buku
+                                        </span>
                                    </div>
 
-                                   {/* Book recommendations */}
-                                   <div>
-                                        <div
-                                             style={{
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent:
-                                                       "space-between",
-                                                  marginBottom: 20,
-                                             }}
-                                        >
-                                             <div>
-                                                  <h3
-                                                       style={{
-                                                            fontSize: 20,
-                                                            fontWeight: 800,
-                                                            letterSpacing:
-                                                                 "-0.5px",
-                                                       }}
-                                                  >
-                                                       Rekomendasi Buku
-                                                  </h3>
-                                                  <p
-                                                       style={{
-                                                            fontSize: 13,
-                                                            color: "#71717a",
-                                                            marginTop: 4,
-                                                       }}
-                                                  >
-                                                       Dipilih berdasarkan
-                                                       kesamaan makna dengan
-                                                       curhatan kamu
-                                                  </p>
-                                             </div>
-                                             <span
-                                                  style={{
-                                                       background: "#18181b",
-                                                       border: "1px solid #27272a",
-                                                       borderRadius: 99,
-                                                       padding: "4px 12px",
-                                                       fontSize: 13,
-                                                       color: "#71717a",
-                                                  }}
-                                             >
-                                                  {
-                                                       result
-                                                            .book_recommendations
-                                                            .length
-                                                  }{" "}
-                                                  buku
-                                             </span>
-                                        </div>
-
-                                        {result.book_recommendations.length >
-                                        0 ? (
-                                             <div className="result-grid">
-                                                  {result.book_recommendations.map(
-                                                       (book, i) => {
-                                                            const gc =
-                                                                 GENRE_COLOR[
-                                                                      book.genre
-                                                                 ] ?? "#71717a";
-                                                            return (
+                                   {result.book_recommendations.length > 0 ? (
+                                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                             {result.book_recommendations.map(
+                                                  (book, i) => {
+                                                       const gc =
+                                                            GENRE_COLOR[
+                                                                 book.genre
+                                                            ] ?? DEFAULT_GENRE;
+                                                       return (
+                                                            <Reveal
+                                                                 key={i}
+                                                                 delay={i * 60}
+                                                            >
                                                                  <div
-                                                                      key={i}
-                                                                      className="book-card"
+                                                                      className="group h-full flex flex-col rounded-2xl border border-zinc-800
+                                        bg-zinc-900 overflow-hidden
+                                        hover:-translate-y-1 hover:border-zinc-700
+                                        hover:shadow-[0_20px_40px_rgba(0,0,0,.5)]
+                                        transition-all duration-200"
                                                                  >
-                                                                      {/* Top accent bar */}
+                                                                      {/* Accent top bar */}
                                                                       <div
-                                                                           style={{
-                                                                                height: 4,
-                                                                                background: `linear-gradient(90deg, ${gc}, ${gc}88)`,
-                                                                           }}
+                                                                           className={`h-1 w-full ${gc.dot}`}
                                                                       />
 
-                                                                      <div
-                                                                           style={{
-                                                                                padding: "20px 20px 22px",
-                                                                                flex: 1,
-                                                                                display: "flex",
-                                                                                flexDirection:
-                                                                                     "column",
-                                                                           }}
-                                                                      >
-                                                                           {/* Genre */}
+                                                                      <div className="flex flex-col flex-1 p-5">
+                                                                           {/* Genre tag */}
                                                                            <span
-                                                                                style={{
-                                                                                     display: "inline-block",
-                                                                                     alignSelf:
-                                                                                          "flex-start",
-                                                                                     background: `${gc}15`,
-                                                                                     color: gc,
-                                                                                     border: `1px solid ${gc}30`,
-                                                                                     borderRadius: 6,
-                                                                                     padding: "2px 10px",
-                                                                                     fontSize: 11,
-                                                                                     fontWeight: 700,
-                                                                                     marginBottom: 12,
-                                                                                     textTransform:
-                                                                                          "capitalize",
-                                                                                }}
+                                                                                className={`self-start inline-flex items-center gap-1 px-2.5 py-0.5
+                                              rounded-md border text-[11px] font-bold uppercase
+                                              tracking-wide capitalize mb-3
+                                              ${gc.text} ${gc.bg} ${gc.border}`}
                                                                            >
                                                                                 {book.genre?.replace(
                                                                                      /_/g,
@@ -1146,13 +779,8 @@ export default function Home() {
 
                                                                            {/* Title */}
                                                                            <h4
-                                                                                style={{
-                                                                                     fontSize: 15,
-                                                                                     fontWeight: 700,
-                                                                                     lineHeight: 1.4,
-                                                                                     marginBottom: 6,
-                                                                                     color: "#fafafa",
-                                                                                }}
+                                                                                className="font-bold text-sm leading-snug mb-1.5 text-zinc-100
+                                           group-hover:text-white transition-colors"
                                                                            >
                                                                                 {book.judul ??
                                                                                      "Judul tidak tersedia"}
@@ -1160,22 +788,12 @@ export default function Home() {
 
                                                                            {/* Author */}
                                                                            {book.penulis && (
-                                                                                <p
-                                                                                     style={{
-                                                                                          fontSize: 13,
-                                                                                          color: "#71717a",
-                                                                                          marginBottom: 10,
-                                                                                     }}
-                                                                                >
+                                                                                <p className="text-xs text-zinc-500 mb-3">
                                                                                      {
                                                                                           book.penulis
                                                                                      }
                                                                                      {book.tahun && (
-                                                                                          <span
-                                                                                               style={{
-                                                                                                    color: "#3f3f46",
-                                                                                               }}
-                                                                                          >
+                                                                                          <span className="text-zinc-700">
                                                                                                {" "}
                                                                                                ·{" "}
                                                                                                {
@@ -1189,19 +807,8 @@ export default function Home() {
                                                                            {/* Synopsis */}
                                                                            {book.sinopsis && (
                                                                                 <p
-                                                                                     style={{
-                                                                                          fontSize: 13,
-                                                                                          color: "#52525b",
-                                                                                          lineHeight: 1.65,
-                                                                                          marginTop:
-                                                                                               "auto",
-                                                                                          display: "-webkit-box",
-                                                                                          WebkitLineClamp: 3,
-                                                                                          WebkitBoxOrient:
-                                                                                               "vertical",
-                                                                                          overflow:
-                                                                                               "hidden",
-                                                                                     }}
+                                                                                     className="mt-auto text-xs text-zinc-600 leading-relaxed
+                                            line-clamp-3"
                                                                                 >
                                                                                      {
                                                                                           book.sinopsis
@@ -1210,60 +817,34 @@ export default function Home() {
                                                                            )}
                                                                       </div>
                                                                  </div>
-                                                            );
-                                                       },
-                                                  )}
-                                             </div>
-                                        ) : (
-                                             <div
-                                                  style={{
-                                                       textAlign: "center",
-                                                       padding: "60px 24px",
-                                                       background: "#18181b",
-                                                       border: "1.5px solid #27272a",
-                                                       borderRadius: 20,
-                                                  }}
-                                             >
-                                                  <div
-                                                       style={{
-                                                            fontSize: 40,
-                                                            marginBottom: 12,
-                                                       }}
-                                                  >
-                                                       📭
-                                                  </div>
-                                                  <p
-                                                       style={{
-                                                            color: "#52525b",
-                                                            fontSize: 15,
-                                                       }}
-                                                  >
-                                                       Belum ada buku untuk
-                                                       genre ini
-                                                  </p>
-                                             </div>
-                                        )}
-                                   </div>
-                              </div>
-                         )}
-                    </section>
+                                                            </Reveal>
+                                                       );
+                                                  },
+                                             )}
+                                        </div>
+                                   ) : (
+                                        <div
+                                             className="flex flex-col items-center justify-center py-16
+                                rounded-2xl border border-zinc-800 bg-zinc-900 text-center"
+                                        >
+                                             <span className="text-4xl mb-3">
+                                                  📭
+                                             </span>
+                                             <p className="text-zinc-500 text-sm">
+                                                  Belum ada buku untuk genre ini
+                                             </p>
+                                        </div>
+                                   )}
+                              </Reveal>
+                         </div>
+                    )}
+               </section>
 
-                    {/* ── Footer ── */}
-                    <footer
-                         style={{
-                              borderTop: "1px solid #18181b",
-                              padding: "32px 24px",
-                              textAlign: "center",
-                              color: "#3f3f46",
-                              fontSize: 14,
-                         }}
-                    >
-                         <span style={{ fontWeight: 700, color: "#52525b" }}>
-                              MoodRead
-                         </span>{" "}
-                         — Deteksi emosi berbasis RoBERTa Indonesia
-                    </footer>
-               </div>
-          </>
+               {/* ══ FOOTER ══════════════════════════════════════════════════════════ */}
+               <footer className="border-t border-zinc-900 py-8 text-center text-xs text-zinc-700">
+                    <span className="font-bold text-zinc-600">MoodRead</span> —
+                    Deteksi emosi berbasis RoBERTa Indonesia
+               </footer>
+          </div>
      );
 }
