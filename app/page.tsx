@@ -356,7 +356,7 @@ export default function Home() {
                       bg-zinc-950/80 backdrop-blur-md border-b border-zinc-900"
                >
                     <div className="flex items-center gap-2.5">
-                         <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-base select-none">
+                         <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base select-none">
                               📚
                          </div>
                          <span className="font-extrabold text-base tracking-tight">
@@ -663,6 +663,7 @@ export default function Home() {
                                                                                 {pct.toFixed(
                                                                                      1,
                                                                                 )}
+
                                                                                 %
                                                                            </span>
                                                                       </div>
